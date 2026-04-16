@@ -1,6 +1,7 @@
 import gzip
 from pathlib import Path
 from typing import Optional, TextIO
+from zlib import crc32
 
 import numpy as np
 
@@ -50,6 +51,13 @@ def _parse_a3m(  # noqa: C901
                 taxonomy_id = taxonomy.get(uniref_id)
                 if taxonomy_id is None:
                     taxonomy_id = -1
+            elif not taxonomy and header.startswith(">UniRef"):
+                # https://github.com/Novel-Therapeutics/boltz-community/commit/51d54c4
+                # Fixes https://github.com/jwohlwend/boltz/issues/627 — without a
+                # taxonomy DB, derive a deterministic int32 pairing key from the
+                # UniRef ID so cached A3Ms still pair across chains.
+                uniref_id = header.lstrip(">").split()[0]
+                taxonomy_id = (crc32(uniref_id.encode()) % (2**31 - 2)) + 1
             else:
                 taxonomy_id = -1
             continue
